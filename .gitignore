@@ -1,0 +1,9 @@
+# Bỏ qua môi trường ảo và file build
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.exe
+build/
+dist/
+*.spec
