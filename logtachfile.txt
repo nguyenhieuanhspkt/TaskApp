@@ -1,0 +1,8 @@
+1. File config.py
+Vai trò: Lưu trữ các tham số cấu hình hệ thống.
+2. File utils.py
+Vai trò: Chứa các hàm xử lý dữ liệu và kiểm tra hệ thống.
+3. File dialogs.py
+Vai trò: Chứa cửa sổ Chào mừng và Dashboard V2 (phần tốn nhiều dòng code nhất).
+4. File main_window.py
+Vai trò: Trái tim của App - Giao diện chính và các chức năng cốt lõi.

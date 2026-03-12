@@ -1,0 +1,6 @@
+streamlit
+pandas
+numpy
+whoosh
+sentence-transformers
+torch

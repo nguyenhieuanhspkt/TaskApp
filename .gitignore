@@ -1,0 +1,15 @@
+# Bỏ qua môi trường ảo và file build
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.exe
+build/
+dist/
+*.spec
+FireBase/FireBaseCred.json
+search_item2/search_item/
+tskt_parser
+vattu_index
+~$*
+*.tmp

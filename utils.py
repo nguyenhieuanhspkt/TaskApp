@@ -1,0 +1,42 @@
+# utils.py
+import os, sys # Thêm sys để kiểm tra môi trường chạy
+from datetime import datetime
+
+def resource_path(relative_path):
+    """ 
+    Lấy đường dẫn tuyệt đối đến tài nguyên (logo, icon...).
+    Hỗ trợ cả khi chạy code (Dev) và khi đã đóng gói (EXE).
+    """
+    try:
+        # Khi đóng gói --onefile, PyInstaller tạo thư mục tạm _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Khi chạy chế độ Dev, dùng đường dẫn thư mục hiện tại
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+class AnalyticsEngine:
+    """Xử lý dữ liệu thô thành các chỉ số KPI để Dashboard hiển thị"""
+    
+    @staticmethod
+    def parse_time(log_str, year):
+        """Chuyển chuỗi '31/12 09:00' thành đối tượng datetime"""
+        try:
+            time_part = log_str.split(": ")[0]
+            return datetime.strptime(f"{year}/{time_part}", "%Y/%d/%m %H:%M")
+        except:
+            return None
+
+    @staticmethod
+    def get_days_diff(t_start, t_end):
+        """Tính số ngày chênh lệch giữa 2 mốc thời gian"""
+        if t_start and t_end:
+            return (t_end - t_start).days
+        return 0
+
+def is_folder_really_empty(folder_path):
+    """Kiểm tra folder có thực sự trống (loại bỏ file ẩn hệ thống)"""
+    if not os.path.exists(folder_path): return True
+    files = [f for f in os.listdir(folder_path) if f not in ['.DS_Store', 'Thumbs.db', 'desktop.ini']]
+    return len(files) == 0
