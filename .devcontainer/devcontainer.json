@@ -1,0 +1,20 @@
+{
+    "name": "Python Docker with Models & EVN Data",
+    "image": "mcr.microsoft.com/devcontainers/python:3.10",
+
+    "mounts": [
+        {
+            "source": "my_docker_BGE",
+            "target": "/com.docker.devenvironments.code/AI_models/BGE",
+            "type": "volume"
+        },
+        {
+            "source": "/home/hieuna/OneDrive - EVN",
+            "target": "/mnt/onedrive-evn",
+            "type": "bind",
+            "consistency": "cached"
+        }
+    ],
+
+    "workspaceFolder": "/com.docker.devenvironments.code"
+}
