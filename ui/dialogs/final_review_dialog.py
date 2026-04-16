@@ -111,36 +111,43 @@ class FinalReviewDialog(QDialog):
         return w
 
     def _load_data(self):
-        """Logic nạp dữ liệu thông minh với các cấp độ ưu tiên."""
+        """Logic nạp dữ liệu: Thông minh lần đầu - Chính xác lần sau"""
+        # Bóc tách lịch sử (dành cho lần rà soát đầu tiên)
         history = self.task_data.get("history", [])
         first_h, last_h, auto_count = parse_history(history)
-
-        # 1. Ngày nhận hồ sơ (Cố định theo Task)
-        self.date_start.setDate(self.default_fallback_date)
-        # Khóa ô này nếu bạn không muốn user sửa ngày nhận ở đây
-        # self.date_start.setEnabled(False) 
-
-        # 2. Logic Mặc định (Fallback): 
-        # Ưu tiên 1: Dữ liệu đã lưu trong báo cáo cũ (final_report_date, ...)
-        # Ưu tiên 2: Dữ liệu bóc tách từ lịch sử (history)
-        # Ưu tiên 3: Ngày nhận hồ sơ của Task (start_date)
         
+        # Lấy túi dữ liệu đã rà soát cũ (nếu có)
+        # Nếu chưa rà soát bao giờ, old_report sẽ là dict trống {}
+        old_report = self.task_data.get("final_report", {})
+
+        # 1. Ngày đề nghị (Mốc cố định)
+        # Ưu tiên: Ngày đã lưu trong final_report > Ngày start_date của hồ sơ
+        start_val = old_report.get("start_date") or self.task_data.get("start_date")
+        self.date_start.setDate(to_qdate(start_val) or QDate.currentDate())
+
+        # 2. Logic các mốc ngày nghiệp vụ (Trọng tâm câu hỏi của bạn)
+        # Cấu trúc: (Ô nhập liệu, Giá trị ưu tiên 1, Giá trị ưu tiên 2)
         dates_to_load = [
-            (self.date_first, self.task_data.get("first_sent_date") or first_h),
-            (self.date_last,  self.task_data.get("completion_date") or last_h),
-            (self.date_report, self.task_data.get("final_report_date"))
+            (self.date_first,  old_report.get("first_sent_date"), first_h),
+            (self.date_last,   old_report.get("completion_date"),  last_h),
+            (self.date_report, old_report.get("final_report_date"), None)
         ]
 
-        for widget, val in dates_to_load:
-            qd = to_qdate(val)
-            if qd:
-                widget.setDate(qd)
-            else:
-                # ⭐ Đây là điểm bạn yêu cầu: Lấy start_date của task nếu trống
-                widget.setDate(self.default_fallback_date)
+        for widget, saved_val, history_val in dates_to_load:
+            # Ưu tiên 1: Lấy dữ liệu đã rà soát lần trước
+            qd = to_qdate(saved_val)
+            if not qd:
+                # Ưu tiên 2: Nếu chưa có (lần rà soát 1), lấy từ lịch sử bóc tách
+                qd = to_qdate(history_val)
+            if not qd:
+                # Ưu tiên 3: Nếu cả 2 đều ko có, lấy ngày nhận hồ sơ (fallback)
+                qd = self.default_fallback_date
+            
+            widget.setDate(qd)
 
         # 3. Số lần chỉnh sửa
-        saved_count = self.task_data.get("sent_count")
+        # Ưu tiên: Số đã lưu > Số tự động tính từ lịch sử
+        saved_count = old_report.get("sent_count")
         self.txt_count.setText(str(saved_count if saved_count is not None else auto_count))
 
     def _validate_form(self):

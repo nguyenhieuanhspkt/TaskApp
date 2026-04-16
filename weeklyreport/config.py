@@ -1,14 +1,16 @@
 # config.py
 import os
 
-# Đường dẫn đến thư mục chứa file tasks.json
+# Đường dẫn JSON
 JSON_ROOT = r"D:\onedrive_hieuna\OneDrive - EVN\Tổ Thẩm định\Năm 2026\TaskApp"
-
-# Đường dẫn đầy đủ đến file json
 JSON_FILE_PATH = os.path.join(JSON_ROOT, "tasks.json")
 
-# Tên file Excel đầu ra
+# Tên file xuất
 OUTPUT_FILENAME = "reportTuan.xlsx"
 
-# Danh mục để nhận diện Pháp chế/Thanh tra
+# CHUẨN HÓA NGÀY THÁNG
+# Định dạng bạn muốn hiển thị trong file Excel (Ví dụ: 16/04/2026)
+DATE_FORMAT_OUT = "%d/%m/%Y"
+
+# Danh mục ưu tiên
 SPECIAL_CATEGORY = "Khác"

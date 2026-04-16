@@ -873,35 +873,54 @@ class TaskManager(QWidget):
             self.show_msg(f"Đã cập nhật hồ sơ {task.get('id')} thành công!")
     # --- HÀM DÙNG CHUNG CHO CẢ MAIN VÀ DASHBOARD ---
     def execute_final_review(self, task):
-        """Logic rà soát dữ liệu chuẩn Sếp yêu cầu - Dùng chung toàn App"""
+        """Logic rà soát dữ liệu: Lưu file + Cập nhật bộ nhớ + Refresh UI"""
         from dialogs import FinalReviewDialog
         from datetime import datetime
-        from PyQt5.QtWidgets import QMessageBox
         import os
 
         dlg = FinalReviewDialog(task, self)
         if dlg.exec_() == QDialog.Accepted:
             final_info = dlg.get_final_data()
             
-            # 1. Cập nhật dữ liệu vào object
+            # 1. Cập nhật dữ liệu vào object task
             task['final_report'] = final_info 
             task['status'] = 'done'
             
             # 2. Ghi nhật ký chuẩn
             current_time = datetime.now().strftime("%H:%M %d/%m/%Y")
             if "history" not in task: task["history"] = []
-            task["history"].append(f"{current_time}: [NGHIEP_VU] Xong - Đã rà soát báo cáo")
             
-            # 3. LƯU QUAN TRỌNG: Lưu đúng vào file JSON của năm đó
+            # Tránh ghi trùng nhật ký nếu rà soát nhiều lần
+            log_msg = f"{current_time}: [NGHIEP_VU] Xong - Đã rà soát báo cáo"
+            if not task["history"] or "[NGHIEP_VU] Xong" not in task["history"][-1]:
+                task["history"].append(log_msg)
+
+            # --- BƯỚC QUAN TRỌNG NHẤT: CẬP NHẬT BỘ NHỚ ĐỆM (self.tasks) ---
+            # Nếu không có bước này, update_list() sẽ load lại dữ liệu cũ chưa có final_report
+            found_in_memory = False
+            for i, t in enumerate(self.tasks):
+                if str(t.get('id')) == str(task.get('id')):
+                    self.tasks[i] = task # Thay bằng object đã có final_report
+                    found_in_memory = True
+                    break
+            
+            # Nếu không tìm thấy trong self.tasks (trường hợp rà soát từ Dashboard năm cũ)
+            # thì biến self.tasks không quan trọng bằng việc gọi update_list() ở dưới
+
+            # 3. LƯU QUAN TRỌNG: Ghi xuống file JSON
             self.save_task_to_year(task)
             
-            # 4. Refresh giao diện chính nếu đang xem đúng năm của task đó
-            if str(task.get('year')) == self.year_combo.currentText() or self.year_combo.currentText() == "Tất cả":
-                self.update_list()
+            # 4. REFRESH GIAO DIỆN CHÍNH
+            # Gọi trực tiếp để đồng bộ bảng danh sách ngay lập tức
+            self.update_list()
 
-            # Gọi hàm xuất file dùng chung
+            # 5. Thông báo nhẹ trên thanh trạng thái
+            self.show_msg(f"Đã rà soát hồ sơ {task.get('id')}")
+
+            # 6. Gọi hàm xuất file dùng chung
             self.prompt_export_options(task)
             return True
+            
         return False
     def prompt_export_options(self, task):
         """Hộp thoại lựa chọn xuất file dùng chung"""
