@@ -1,4 +1,4 @@
-import os, json, csv, getpass, subprocess, re
+import os, json, csv, getpass, subprocess, re,sys
 from datetime import datetime
 
 # Thư viện bên thứ ba
@@ -20,7 +20,13 @@ from dialogs import (
     FinalReviewDialog,
     TaskHistoryDialog,
 )
+# Đảm bảo thư mục gốc TaskApp nằm trong hệ thống tìm kiếm
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
+# Bây giờ import sẽ an toàn hơn
+from weeklyreport.main import WeeklyReportExporter# Giả sử class/hàm chính trong đó tên này
 
 class TaskManager(QWidget):
     def __init__(self, root_folder):
@@ -68,10 +74,17 @@ class TaskManager(QWidget):
         self.btn_report.setFixedSize(100, 28)
         self.btn_report.setStyleSheet("background: #217346; color: white; font-weight: bold; border-radius: 5px;")
         
+        # THÊM NÚT BÁO CÁO TUẦN VÀO ĐÂY
+        self.btn_weekly = QPushButton("📅 WEEKLY")
+        self.btn_weekly.clicked.connect(self.export_weekly_report_feature)
+        self.btn_weekly.setFixedSize(100, 28)
+        self.btn_weekly.setStyleSheet("background: #005A9E; color: white; font-weight: bold; border-radius: 5px;")
+        
         top_row.addWidget(self.status_msg)
         top_row.addStretch()
         top_row.addWidget(self.btn_dash)
         top_row.addWidget(self.btn_report)
+        top_row.addWidget(self.btn_weekly)
         layout.addLayout(top_row)
 
         # --- HÀNG 2: TÌM KIẾM ---
@@ -1084,3 +1097,12 @@ class TaskManager(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Lỗi xuất file", f"Lỗi: {str(e)}")
+            
+    def export_weekly_report_feature(self):
+        try:
+            # Gọi trực tiếp cực kỳ đơn giản
+            exporter = WeeklyReportExporter()
+            exporter.export()
+            self.show_msg("Xuất báo cáo tuần thành công!")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Không thể gọi module: {str(e)}")

@@ -5,7 +5,7 @@ from PyQt5.QtGui import QFont
 from dialogs import WelcomeUserDialog
 from main_window import TaskManager
 
-
+    
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     

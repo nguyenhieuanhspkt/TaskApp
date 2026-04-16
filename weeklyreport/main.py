@@ -3,11 +3,16 @@ import os
 import xlsxwriter
 import re
 from datetime import datetime, timedelta
-import config 
+try:
+    # Cách này dùng khi chạy từ main_window.py (Import theo kiểu package)
+    from . import weeklyconfig
+except (ImportError, ValueError):
+    # Cách này dùng khi bạn chạy trực tiếp file main.py này trong folder weeklyreport
+    import weeklyconfig 
 
 class WeeklyReportExporter:
     def __init__(self):
-        self.json_path = config.JSON_FILE_PATH
+        self.json_path = weeklyconfig.JSON_FILE_PATH
         self.today = datetime.now().date()
         self.start_week = self.today - timedelta(days=self.today.weekday())
         self.authors_map = {"Admins": "Chị Chi", "hieuna_3": "Anh Hiếu", "tuank": "Tuấn Kiệt"}
@@ -135,9 +140,9 @@ class WeeklyReportExporter:
         weekly_tasks = [t for t in all_tasks if self.is_active_this_week(t)]
         if not weekly_tasks: return
 
-        weekly_tasks.sort(key=lambda x: (not (x.get('category') == config.SPECIAL_CATEGORY or not x.get('category')), -x.get('id', 0)))
+        weekly_tasks.sort(key=lambda x: (not (x.get('category') == weeklyconfig.SPECIAL_CATEGORY or not x.get('category')), -x.get('id', 0)))
 
-        workbook = xlsxwriter.Workbook(config.OUTPUT_FILENAME)
+        workbook = xlsxwriter.Workbook(weeklyconfig.OUTPUT_FILENAME)
         detail_sheet = workbook.add_worksheet('Báo cáo chi tiết')
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#1F4E78', 'font_color': 'white', 'border': 1, 'align': 'center'})
         
@@ -146,7 +151,7 @@ class WeeklyReportExporter:
 
         for row, t in enumerate(weekly_tasks, start=1):
             eval_text, explanation, color = self.calculate_efficiency(t)
-            is_special = (t.get('category') == config.SPECIAL_CATEGORY or not t.get('category'))
+            is_special = (t.get('category') == weeklyconfig.SPECIAL_CATEGORY or not t.get('category'))
             fmt = workbook.add_format({'border': 1, 'text_wrap': True, 'valign': 'vcenter', 'bg_color': '#E2EFDA' if is_special else '#FFFFFF'})
             eval_fmt = workbook.add_format({'border': 1, 'text_wrap': True, 'valign': 'vcenter', 'bg_color': color if color else '#FFFFFF', 'bold': True})
 
@@ -157,8 +162,8 @@ class WeeklyReportExporter:
             detail_sheet.write(row, 1, "Pháp chế/Thanh tra" if is_special else "Thẩm định", fmt)
             detail_sheet.write(row, 2, self.authors_map.get(t.get('author', ''), t.get('author', '')), fmt)
             detail_sheet.write(row, 3, clean_title, fmt) # Ghi tiêu đề đã sạch
-            detail_sheet.write(row, 4, self.standardize_date(t.get('start_date')).strftime(config.DATE_FORMAT_OUT) if self.standardize_date(t.get('start_date')) else "-", fmt)
-            detail_sheet.write(row, 5, self.standardize_date(t.get('final_report', {}).get('completion_date')).strftime(config.DATE_FORMAT_OUT) if self.standardize_date(t.get('final_report', {}).get('completion_date')) else "-", fmt)
+            detail_sheet.write(row, 4, self.standardize_date(t.get('start_date')).strftime(weeklyconfig.DATE_FORMAT_OUT) if self.standardize_date(t.get('start_date')) else "-", fmt)
+            detail_sheet.write(row, 5, self.standardize_date(t.get('final_report', {}).get('completion_date')).strftime(weeklyconfig.DATE_FORMAT_OUT) if self.standardize_date(t.get('final_report', {}).get('completion_date')) else "-", fmt)
             detail_sheet.write(row, 6, eval_text, eval_fmt)
             detail_sheet.write(row, 7, explanation, fmt)
             detail_sheet.write(row, 8, self.friendly_log(t.get('history', [])[-1] if t.get('history') else ""), fmt)
@@ -167,7 +172,8 @@ class WeeklyReportExporter:
         detail_sheet.set_column('G:G', 22)
         detail_sheet.set_column('H:I', 50)
         workbook.close()
-        os.startfile(config.OUTPUT_FILENAME)
+        os.startfile(weeklyconfig.OUTPUT_FILENAME)
 
 if __name__ == "__main__":
     WeeklyReportExporter().export()
+    print("Báo cáo tuần đã được xuất thành công!")
