@@ -1,0 +1,9 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=D:/TaskApp_kiet/TaskApp,target=/workspace,type=bind",
+    "source=D:/TaskApp_kiet,target=/models,type=bind",
+    "source=D:/onedrive_hieuna/OneDrive - EVN,target=/mnt/onedrive-evn,type=bind"
+  ]
+}

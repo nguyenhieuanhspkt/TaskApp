@@ -13,3 +13,4 @@ tskt_parser
 vattu_index
 ~$*
 *.tmp
+getnewtaskinweek/*.json
