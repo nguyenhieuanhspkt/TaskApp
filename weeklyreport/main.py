@@ -3,28 +3,39 @@ import os
 import xlsxwriter
 import re
 from datetime import datetime, timedelta
+# Import tương đối file cấu hình
 try:
-    # Cách này dùng khi chạy từ main_window.py (Import theo kiểu package)
     from . import weeklyconfig
 except (ImportError, ValueError):
-    # Cách này dùng khi bạn chạy trực tiếp file main.py này trong folder weeklyreport
-    import weeklyconfig 
+    import weeklyconfig
 
 class WeeklyReportExporter:
-    def __init__(self):
+    def __init__(self, root_path_from_manager, year):
+        """
+        :param root_path_from_manager: D:\onedrive_hieuna\... (đến Tổ Thẩm định)
+        :param year: 2026
+        """
         self.json_path = weeklyconfig.JSON_FILE_PATH
         self.today = datetime.now().date()
+        # Xác định ngày thứ Hai của tuần này
         self.start_week = self.today - timedelta(days=self.today.weekday())
-        self.authors_map = {"Admins": "Chị Chi", "hieuna_3": "Anh Hiếu", "tuank": "Tuấn Kiệt"}
+        
+        # Bản đồ chuyển đổi tên User hiển thị trong Excel
+        self.authors_map = {
+            "Admins": "Chị Chi", 
+            "hieuna_3": "Anh Hiếu", 
+            "tuank": "Tuấn Kiệt"
+        }
+        
+        # Lưu đường dẫn gốc để tạo Link Folder
+        self.base_path = os.path.join(root_path_from_manager, f"Năm {year}")
 
     def clean_task_title(self, text):
-        """Hàm chuẩn hóa tiêu đề hồ sơ theo yêu cầu của Anh Hiếu"""
+        """Chuẩn hóa tiêu đề: Viết hoa chữ đầu, thay viết tắt, giữ ngoại lệ 'Thực hiện'"""
         if not text: return ""
-        
-        # 1. Loại bỏ xuống dòng và khoảng trắng thừa
         text = text.replace('\n', ' ').strip()
         
-        # 2. Từ điển các từ viết tắt cần thay thế
+        # 1. Từ điển viết tắt
         replacements = {
             r"KQLCNT": "kết quả lựa chọn nhà thầu",
             r"KHLCNT": "kế hoạch lựa chọn nhà thầu",
@@ -45,44 +56,39 @@ class WeeklyReportExporter:
             r"NMNĐ": "nhà máy nhiệt điện",
             r"VTSCTX": "vật tư sửa chữa thường xuyên"
         }
-
-        # Thay thế các từ viết tắt (không phân biệt hoa thường)
         for short, long in replacements.items():
             text = re.sub(short, long, text, flags=re.IGNORECASE)
 
-        # 3. Đảm bảo bắt đầu bằng "Thẩm định" hoặc "Thẩm tra"
-        # Xóa tiền tố "Re: " hoặc các ký tự lạ ở đầu
+        # 2. Xử lý Prefix (Ngoại lệ: Thực hiện)
         text = re.sub(r'^(Re:\s*|V/v\s*)', '', text, flags=re.IGNORECASE).strip()
-        
         check_prefix = text.lower()
-        if not (check_prefix.startswith("thẩm định") or check_prefix.startswith("thẩm tra")):
+        allowed_prefixes = ("thẩm định", "thẩm tra", "thực hiện")
+        
+        if not check_prefix.startswith(allowed_prefixes):
             text = "Thẩm định " + text
 
-        # 4. Định dạng Sentence case (Viết hoa chữ đầu, còn lại viết thường)
-        # Lưu ý: Giữ lại viết hoa cho các danh từ riêng như VT4, S3 nếu cần, 
-        # nhưng ở đây em làm chuẩn sentence case như Anh yêu cầu.
+        # 3. Sentence case
         text = text.capitalize()
-        
         return text
 
     def standardize_date(self, date_input):
+        """Chuyển đổi các định dạng ngày về đối tượng date"""
         if not date_input or not isinstance(date_input, str): return None
-        try: return datetime.strptime(date_input[:10], "%Y-%m-%d").date()
-        except: pass
-        try: return datetime.strptime(date_input[:10], "%d/%m/%Y").date()
-        except: pass
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(date_input[:10], fmt).date()
+            except:
+                continue
         return None
 
     def calculate_efficiency(self, task):
+        """Tính toán hiệu quả và giải trình tiến độ"""
         status = task.get('status')
         if status != "done":
             return "Đang xử lý", "Đang trong tiến độ thực hiện.", "#FFFFFF"
 
         final = task.get('final_report', {})
-        sd_inside = final.get('start_date')
-        sd_outside = task.get('start_date')
-        sd = self.standardize_date(sd_inside) if sd_inside else self.standardize_date(sd_outside)
-        
+        sd = self.standardize_date(final.get('start_date') or task.get('start_date'))
         if not sd: return "Thiếu dữ liệu", "Chưa xác định ngày bắt đầu.", None
 
         fsd = self.standardize_date(final.get('first_sent_date'))
@@ -93,87 +99,106 @@ class WeeklyReportExporter:
         res_text, res_color, explanation = "Hoàn thành đúng hạn", "#E2EFDA", "Hoàn thành trong thời gian quy định."
 
         if actual_delta > 3:
-            if fsd:
-                work_days = (fsd - sd).days + 1
-                if work_days <= 3:
-                    explanation = f"Tổng thời gian xử lý thực tế {work_days} ngày (Có thời gian chờ bổ sung hồ sơ)."
-                else:
-                    res_text, res_color = f"Trễ hạn ({actual_delta-3} ngày)", "#FFC7CE"
-                    explanation = "Hồ sơ phức tạp, cần nhiều thời gian đối chiếu quy chuẩn kỹ thuật."
+            if fsd and (fsd - sd).days + 1 <= 3:
+                explanation = f"Thời gian xử lý thực tế phù hợp (có chờ bổ sung hồ sơ)."
             else:
                 res_text, res_color = f"Trễ hạn ({actual_delta-3} ngày)", "#FFC7CE"
-                explanation = "Thời gian xử lý kéo dài do rà soát kỹ các thông số kỹ thuật."
+                explanation = "Hồ sơ phức tạp, cần nhiều thời gian đối chiếu quy chuẩn kỹ thuật."
         
         return res_text, explanation, res_color
 
     def friendly_log(self, log_str):
+        """Làm đẹp dòng nhật ký cuối cùng"""
         if not log_str: return "Mới nhận hồ sơ"
         match = re.search(r'(\d{2}/\d{2})', log_str)
-        day_month = match.group(1) if match else self.today.strftime("%d/%m")
-        date_suffix = f" ngày {day_month}/2026"
+        date_suffix = f" ngày {match.group(1)}/2026" if match else ""
+        
         if "Tạo mới" in log_str: return f"Vừa được đề nghị thẩm định{date_suffix}"
-        if "Gửi ý kiến Zalo" in log_str: return f"Đã gửi ý kiến thẩm định{date_suffix}"
-        if "Chỉnh sửa thông tin/phân loại hồ sơ" in log_str: return f"Đã chuẩn xác tên gọi công việc{date_suffix}"
-        if "Chuyển: doing" in log_str: return f"Vừa cập nhật trạng thái đang xử lý sau khi nhận hồ sơ{date_suffix}"
-        if "Xong - Đã rà soát báo cáo" in log_str: return f"Đã ban hành báo cáo thẩm định{date_suffix} và rà soát xong tiến độ công việc"
+        if "Xong - Đã rà soát báo cáo" in log_str: return f"Đã ban hành báo cáo thẩm định{date_suffix}"
         return log_str
 
     def get_data(self):
+        """Đọc file tasks.json"""
         if not os.path.exists(self.json_path): return []
-        with open(self.json_path, "r", encoding="utf-8") as f: return json.load(f)
+        with open(self.json_path, "r", encoding="utf-8") as f: 
+            return json.load(f)
 
     def is_active_this_week(self, task):
-        sd = self.standardize_date(task.get('start_date'))
-        if sd and sd >= self.start_week: return True
+        """Logic lọc hồ sơ: Chỉ hiện những việc thực sự làm trong tuần này"""
         final = task.get('final_report', {})
-        for key in ['completion_date', 'final_report_date']:
-            fd = self.standardize_date(final.get(key))
-            if fd and fd >= self.start_week: return True
-        history = task.get('history', [])
-        check_days = [(self.start_week + timedelta(days=i)).strftime("%d/%m") for i in range(5)]
-        for log in history:
-            if any(d in log for d in check_days): return True
+        # 1. Nếu đã có báo cáo cuối cùng
+        if final:
+            report_date = self.standardize_date(final.get('final_report_date'))
+            completion_date = self.standardize_date(final.get('completion_date'))
+            # Nếu ngày xong nằm trong tuần này thì hiện
+            if (report_date and report_date >= self.start_week) or \
+               (completion_date and completion_date >= self.start_week):
+                return True
+            return False # Đã xong từ tuần trước thì loại bỏ
+
+        # 2. Nếu hồ sơ chưa xong (đang làm)
+        sd = self.standardize_date(task.get('start_date'))
+        if sd and sd >= self.start_week: return True # Mới nhận tuần này
+        if task.get('status') in ['doing', 'sent']: return True # Làm từ tuần trước chưa xong
+
         return False
 
     def export(self):
+        """Hàm chính thực hiện xuất file Excel"""
         all_tasks = self.get_data()
         weekly_tasks = [t for t in all_tasks if self.is_active_this_week(t)]
         if not weekly_tasks: return
 
+        # Sắp xếp hồ sơ
         weekly_tasks.sort(key=lambda x: (not (x.get('category') == weeklyconfig.SPECIAL_CATEGORY or not x.get('category')), -x.get('id', 0)))
 
         workbook = xlsxwriter.Workbook(weeklyconfig.OUTPUT_FILENAME)
-        detail_sheet = workbook.add_worksheet('Báo cáo chi tiết')
-        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#1F4E78', 'font_color': 'white', 'border': 1, 'align': 'center'})
+        sheet = workbook.add_worksheet('Báo cáo chi tiết')
         
-        headers = ["STT", "Lĩnh vực", "Chuyên viên", "Nội dung hồ sơ", "Ngày bắt đầu", "Ngày xong", "Đánh giá", "Giải trình tiến độ", "Tiến độ chi tiết"]
-        for i, h in enumerate(headers): detail_sheet.write(0, i, h, header_fmt)
+        # Format
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#1F4E78', 'font_color': 'white', 'border': 1, 'align': 'center'})
+        link_fmt = workbook.add_format({'font_color': 'blue', 'underline': True, 'border': 1, 'valign': 'vcenter'})
+        
+        headers = ["STT", "Lĩnh vực", "Chuyên viên", "Nội dung hồ sơ", "Ngày bắt đầu", "Ngày xong", "Đánh giá", "Giải trình tiến độ", "Link Folder"]
+        for i, h in enumerate(headers): sheet.write(0, i, h, header_fmt)
 
         for row, t in enumerate(weekly_tasks, start=1):
             eval_text, explanation, color = self.calculate_efficiency(t)
             is_special = (t.get('category') == weeklyconfig.SPECIAL_CATEGORY or not t.get('category'))
+            
             fmt = workbook.add_format({'border': 1, 'text_wrap': True, 'valign': 'vcenter', 'bg_color': '#E2EFDA' if is_special else '#FFFFFF'})
-            eval_fmt = workbook.add_format({'border': 1, 'text_wrap': True, 'valign': 'vcenter', 'bg_color': color if color else '#FFFFFF', 'bold': True})
+            eval_fmt = workbook.add_format({'border': 1, 'text_wrap': True, 'valign': 'vcenter', 'bg_color': color or '#FFFFFF', 'bold': True})
 
-            # CLEAN TEXT TIÊU ĐỀ TẠI ĐÂY
-            clean_title = self.clean_task_title(t.get('title', ''))
+            sheet.write(row, 0, row, fmt)
+            sheet.write(row, 1, "Pháp chế" if is_special else "Thẩm định", fmt)
+            sheet.write(row, 2, self.authors_map.get(t.get('author', ''), t.get('author', '')), fmt)
+            sheet.write(row, 3, self.clean_task_title(t.get('title', '')), fmt)
+            
+            d_start = self.standardize_date(t.get('start_date'))
+            d_end = self.standardize_date(t.get('final_report', {}).get('completion_date'))
+            
+            sheet.write(row, 4, d_start.strftime(weeklyconfig.DATE_FORMAT_OUT) if d_start else "-", fmt)
+            sheet.write(row, 5, d_end.strftime(weeklyconfig.DATE_FORMAT_OUT) if d_end else "-", fmt)
+            sheet.write(row, 6, eval_text, eval_fmt)
+            sheet.write(row, 7, explanation, fmt)
 
-            detail_sheet.write(row, 0, row, fmt)
-            detail_sheet.write(row, 1, "Pháp chế/Thanh tra" if is_special else "Thẩm định", fmt)
-            detail_sheet.write(row, 2, self.authors_map.get(t.get('author', ''), t.get('author', '')), fmt)
-            detail_sheet.write(row, 3, clean_title, fmt) # Ghi tiêu đề đã sạch
-            detail_sheet.write(row, 4, self.standardize_date(t.get('start_date')).strftime(weeklyconfig.DATE_FORMAT_OUT) if self.standardize_date(t.get('start_date')) else "-", fmt)
-            detail_sheet.write(row, 5, self.standardize_date(t.get('final_report', {}).get('completion_date')).strftime(weeklyconfig.DATE_FORMAT_OUT) if self.standardize_date(t.get('final_report', {}).get('completion_date')) else "-", fmt)
-            detail_sheet.write(row, 6, eval_text, eval_fmt)
-            detail_sheet.write(row, 7, explanation, fmt)
-            detail_sheet.write(row, 8, self.friendly_log(t.get('history', [])[-1] if t.get('history') else ""), fmt)
+            # TẠO LINK FOLDER DỰA TRÊN USER ĐÃ CHỌN
+            folder_name = t.get('folder', '')
+            if self.base_path and folder_name:
+                full_link = os.path.join(self.base_path, folder_name)
+                # Dùng external để mở thư mục Windows Explorer
+                sheet.write_url(row, 8, f"external:{full_link}", link_fmt, string="Mở thư mục")
+            else:
+                sheet.write(row, 8, "Không có link", fmt)
 
-        detail_sheet.set_column('D:D', 50)
-        detail_sheet.set_column('G:G', 22)
-        detail_sheet.set_column('H:I', 50)
+        sheet.set_column('D:D', 50)
+        sheet.set_column('G:G', 22)
+        sheet.set_column('H:H', 40)
+        sheet.set_column('I:I', 15)
+        
         workbook.close()
         os.startfile(weeklyconfig.OUTPUT_FILENAME)
 
 if __name__ == "__main__":
-    WeeklyReportExporter().export()
-    print("Báo cáo tuần đã được xuất thành công!")
+    # Test nhanh (phải chạy bằng python -m weeklyreport.main)
+    WeeklyReportExporter(r"D:\TestPath").export()

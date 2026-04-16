@@ -20,13 +20,13 @@ from dialogs import (
     FinalReviewDialog,
     TaskHistoryDialog,
 )
-# Đảm bảo thư mục gốc TaskApp nằm trong hệ thống tìm kiếm
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
 
-# Bây giờ import sẽ an toàn hơn
-from weeklyreport.main import WeeklyReportExporter# Giả sử class/hàm chính trong đó tên này
+# Nạp module weeklyreport từ thư mục tạm của EXE
+weekly_dir = resource_path("weeklyreport")
+if weekly_dir not in sys.path:
+    # Thêm thư mục chứa weeklyreport vào hệ thống
+    sys.path.insert(0, os.path.dirname(weekly_dir))
+from weeklyreport.main import WeeklyReportExporter
 
 class TaskManager(QWidget):
     def __init__(self, root_folder):
@@ -1100,9 +1100,17 @@ class TaskManager(QWidget):
             
     def export_weekly_report_feature(self):
         try:
-            # Gọi trực tiếp cực kỳ đơn giản
-            exporter = WeeklyReportExporter()
+            # Khởi tạo và truyền 'self.root_folder' (đường dẫn OneDrive user đã chọn)
+            exporter = WeeklyReportExporter(self.root_folder,self.current_year)
+            
+            # Chạy lệnh xuất
             exporter.export()
-            self.show_msg("Xuất báo cáo tuần thành công!")
+            
+            # (Tùy chọn) Thông báo thành công
+            # self.show_status_message("Báo cáo tuần đã được mở!")
+        
         except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Không thể gọi module: {str(e)}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Lỗi xuất báo cáo: {error_details}")
+            # QMessageBox.critical(self, "Lỗi", f"Không thể xuất báo cáo: {str(e)}")
