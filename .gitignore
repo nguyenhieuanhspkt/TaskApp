@@ -1,4 +1,5 @@
 # Bỏ qua môi trường ảo và file build
+venv/
 .venv/
 .vscode/
 __pycache__/

@@ -209,27 +209,57 @@ class ExcelProcessor(ExcelMapperUI):
             
     
     def execute_grouping(self):
+        # 1. Kiểm tra xem đã có dữ liệu từ nút Preview chưa
         if self.current_preview_df is not None:
             try:
-                # QUAN TRỌNG: Tên cột phải khớp 100% với chữ ở cột bên trái giao diện của anh
-                self.current_preview_df = MaterialProcessor.mark_duplicates(
+                # 2. Gọi logic xử lý từ AIgemini.py
+                # Anh lưu ý: col_name và col_spec phải khớp hoàn toàn với Barem của anh
+                processed_df = MaterialProcessor.mark_duplicates(
                     self.current_preview_df, 
-                    col_name='Tên vật tư',       # Khớp với UI
-                    col_spec='Thông số kỹ thuật' # Khớp với UI (trong ảnh anh ghi là Thông số kỹ thuật)
+                    col_name='Tên vật tư', 
+                    col_spec='Thông số kỹ thuật' 
                 )
                 
-                # Sau khi có cột Is_Duplicate, vẽ lại bảng
+                # Cập nhật lại biến chính và hiển thị lên bảng TableWidget để xem màu sắc
+                self.current_preview_df = processed_df
                 self.display_table(self.current_preview_df)
                 
+                # 3. Thông báo số lượng trùng lặp
                 num_dups = self.current_preview_df['Is_Duplicate'].sum()
-                QMessageBox.information(self, "Kết quả", f"Tìm thấy {num_dups} dòng nghi ngờ trùng lặp!")
+                
+                # 4. Mở hộp thoại để người dùng chọn nơi lưu file Excel kết quả
+                from PyQt5.QtWidgets import QFileDialog
+                
+                # Gợi ý tên file dựa trên file gốc (nếu có)
+                default_filename = "Ket_qua_danh_gia_trung.xlsx"
+                if self.file_path:
+                    import os
+                    base_name = os.path.basename(self.file_path)
+                    default_filename = f"Danh_gia_trung_{base_name}"
+
+                save_path, _ = QFileDialog.getSaveFileName(
+                    self, "Lưu file kết quả đánh giá trùng", default_filename, "Excel Files (*.xlsx)"
+                )
+
+                if save_path:
+                    # Xuất toàn bộ DataFrame ra Excel
+                    # Nếu anh không muốn cột 'Is_Duplicate' xuất hiện trong file Excel, 
+                    # anh có thể dùng: processed_df.drop(columns=['Is_Duplicate']).to_excel(...)
+                    self.current_preview_df = self.current_preview_df.sort_values(by=['Group_ID'])
+                    self.current_preview_df.to_excel(save_path, index=False)
+                    
+                    QMessageBox.information(
+                        self, "Thành công", 
+                        f"Đã xử lý xong!\n- Tìm thấy {num_dups} dòng trùng.\n- File đã được lưu tại: {save_path}"
+                    )
             
             except Exception as e:
-                # In ra lỗi chi tiết để debug nếu vẫn lỗi
-                print(f"Debug Error: {e}")
-                QMessageBox.critical(self, "Lỗi logic", f"Lỗi thực thi phân nhóm: {str(e)}")
+                # In lỗi chi tiết ra màn hình đen (console) để anh dễ sửa nếu có lỗi tên cột
+                import traceback
+                print(traceback.format_exc())
+                QMessageBox.critical(self, "Lỗi thực thi", f"Lỗi thực thi phân nhóm: {str(e)}")
         else:
-            QMessageBox.warning(self, "Lưu ý", "Vui lòng bấm '1. XEM PREVIEW' trước!")
+            QMessageBox.warning(self, "Lưu ý", "Vui lòng bấm '1. XEM PREVIEW' để nạp dữ liệu trước!")
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = ExcelProcessor()
