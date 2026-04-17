@@ -83,9 +83,8 @@ class AIWindow(QWidget):
 
         # DANH SÁCH CÁC CÔNG CỤ (Anh có thể thêm mới ở đây)
         self.tools = [
-            ("Dịch thuật AI", "Dịch thuật hồ sơ kỹ thuật chuyên ngành.", "#E67E22", "translator"),
+            ("Đánh giá trùng", "Đánh giá file vật tư trùng nhau sử dụng AI.", "#E67E22", "is_duplicate"),
             ("Tra cứu Vật tư", "Tìm kiếm vật tư thông minh bằng AI.", "#3498DB", "vattu_search"),
-            ("Tóm tắt Hồ sơ", "Trích xuất ý chính từ file thầu dài.", "#27AE60", "summarizer"),
             ("Kiểm tra Đơn giá", "So sánh đơn giá với dữ liệu quá khứ.", "#E74C3C", "price_check"),
         ]
 
@@ -106,11 +105,19 @@ class AIWindow(QWidget):
             self.grid_layout.addWidget(card, row, col)
 
     def open_tool(self, tool_id):
-        # Hàm điều hướng khi bấm vào từng thẻ
-        print(f"Đang mở công cụ: {tool_id}")
-        if tool_id == "translator":
-            # logic mở translator tại đây
-            pass
-        elif tool_id == "vattu_search":
-            # logic mở tra cứu tại đây
-            pass
+        # 1. Xóa cửa sổ cũ nếu đang mở (để dọn dẹp bộ nhớ)
+        if hasattr(self, 'current_tool_window') and self.current_tool_window:
+            self.current_tool_window.close()
+
+        try:
+            if tool_id == "is_duplicate":
+                from ai_hub.tools import ExcelProcessor
+                self.current_tool_window = ExcelProcessor()
+                self.current_tool_window.show()
+
+           
+                
+            # Thêm các tool khác ở đây...
+            
+        except Exception as e:
+            print(f"Lỗi khởi tạo công cụ: {e}")

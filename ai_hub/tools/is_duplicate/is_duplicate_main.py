@@ -2,9 +2,9 @@
 import sys
 import pandas as pd
 from PyQt5.QtWidgets import QApplication, QMessageBox, QTableWidgetItem, QLabel, QComboBox, QPushButton
-from ui_design import ExcelMapperUI
-from ui_design_config import DATA_TYPES, DEFAULT_BAREM_CONFIG, PREVIEW_ROWS
-from AIgemini import MaterialProcessor
+from .ui_design import ExcelMapperUI
+from .is_duplicate_ui_design_config import DATA_TYPES, DEFAULT_BAREM_CONFIG, PREVIEW_ROWS
+from .AIgemini import MaterialProcessor
 class ExcelProcessor(ExcelMapperUI):
     def __init__(self):
         super().__init__()

@@ -1128,7 +1128,7 @@ class TaskManager(QWidget):
             
         try:
             # Gọi thẳng từ Package ai_hub
-            from ai_hub import AIWindow 
+            from ai_hub.main_hub import AIWindow 
             self.ai_window = AIWindow()
             self.ai_window.show()
         except Exception as e:

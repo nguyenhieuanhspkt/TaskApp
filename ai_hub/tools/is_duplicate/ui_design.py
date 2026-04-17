@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QComboBox, QLabel, 
     QTableWidget, QSpinBox, QHBoxLayout, QGridLayout, QScrollArea, QLineEdit,QListWidget
 )
-from ui_design_config import APP_TITLE
+from ai_hub.tools.is_duplicate.is_duplicate_ui_design_config import APP_TITLE
 
 class ExcelMapperUI(QWidget):
     def __init__(self):
