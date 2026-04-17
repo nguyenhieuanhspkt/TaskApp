@@ -4,7 +4,7 @@ import pandas as pd
 from PyQt5.QtWidgets import QApplication, QMessageBox, QTableWidgetItem, QLabel, QComboBox, QPushButton
 from ui_design import ExcelMapperUI
 from ui_design_config import DATA_TYPES, DEFAULT_BAREM_CONFIG, PREVIEW_ROWS
-
+from AIgemini import MaterialProcessor
 class ExcelProcessor(ExcelMapperUI):
     def __init__(self):
         super().__init__()
@@ -16,6 +16,7 @@ class ExcelProcessor(ExcelMapperUI):
         self.excel_columns = ["-- Bỏ qua --"]
         self.refresh_mapping_ui()
         self.current_preview_df = None # Lưu DF vừa preview xong
+        
         self.all_collected_dfs = []    # Danh sách các DF đã bấm Kết chuyển
         # Kết nối sự kiện
         # btn_open.clicked: Mở hộp thoại chọn file Excel từ máy tính và nạp danh sách các Sheet vào ứng dụng.
@@ -31,6 +32,7 @@ class ExcelProcessor(ExcelMapperUI):
         self.btn_preview.clicked.connect(self.process_and_preview)
         self.btn_transfer.clicked.connect(self.transfer_data)
         self.btn_combine.clicked.connect(self.combine_data)
+        self.btn_grouping.clicked.connect(self.execute_grouping)
 
     def refresh_mapping_ui(self):
         """Vẽ lại giao diện Mapping với kiểu dữ liệu mặc định"""
@@ -132,13 +134,33 @@ class ExcelProcessor(ExcelMapperUI):
             QMessageBox.critical(self, "Lỗi xử lý", f"Lỗi: {str(e)}")
         
     def display_table(self, df):
+        if df is None: return
+        
         self.table_preview.setRowCount(df.shape[0])
         self.table_preview.setColumnCount(len(df.columns))
         self.table_preview.setHorizontalHeaderLabels(df.columns)
+        
+        from PyQt5.QtGui import QColor
+
         for i in range(len(df)):
+            # SỬA Ở ĐÂY: Dùng get() để tránh lỗi nếu cột chưa tồn tại
+            is_dup = False
+            if 'Is_Duplicate' in df.columns:
+                # Lấy giá trị tại hàng i, cột 'Is_Duplicate'
+                # Nếu bị lỗi hoặc NaN thì mặc định là False
+                val_dup = df.iloc[i].get('Is_Duplicate', False)
+                is_dup = bool(val_dup) if pd.notna(val_dup) else False
+
             for j in range(len(df.columns)):
                 val = df.iloc[i, j]
-                self.table_preview.setItem(i, j, QTableWidgetItem(str(val) if pd.notna(val) else ""))
+                item = QTableWidgetItem(str(val) if pd.notna(val) else "")
+                
+                # Tô màu nếu là hàng trùng
+                if is_dup:
+                    item.setBackground(QColor(255, 255, 200)) # Màu vàng nhạt
+                
+                self.table_preview.setItem(i, j, item)
+        
         self.table_preview.resizeColumnsToContents()
     def transfer_data(self):
         """Đẩy dữ liệu từ Preview sang danh sách chờ"""
@@ -184,6 +206,30 @@ class ExcelProcessor(ExcelMapperUI):
                 
         except Exception as e:
             QMessageBox.critical(self, "Lỗi khi gộp", str(e))
+            
+    
+    def execute_grouping(self):
+        if self.current_preview_df is not None:
+            try:
+                # QUAN TRỌNG: Tên cột phải khớp 100% với chữ ở cột bên trái giao diện của anh
+                self.current_preview_df = MaterialProcessor.mark_duplicates(
+                    self.current_preview_df, 
+                    col_name='Tên vật tư',       # Khớp với UI
+                    col_spec='Thông số kỹ thuật' # Khớp với UI (trong ảnh anh ghi là Thông số kỹ thuật)
+                )
+                
+                # Sau khi có cột Is_Duplicate, vẽ lại bảng
+                self.display_table(self.current_preview_df)
+                
+                num_dups = self.current_preview_df['Is_Duplicate'].sum()
+                QMessageBox.information(self, "Kết quả", f"Tìm thấy {num_dups} dòng nghi ngờ trùng lặp!")
+            
+            except Exception as e:
+                # In ra lỗi chi tiết để debug nếu vẫn lỗi
+                print(f"Debug Error: {e}")
+                QMessageBox.critical(self, "Lỗi logic", f"Lỗi thực thi phân nhóm: {str(e)}")
+        else:
+            QMessageBox.warning(self, "Lưu ý", "Vui lòng bấm '1. XEM PREVIEW' trước!")
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = ExcelProcessor()

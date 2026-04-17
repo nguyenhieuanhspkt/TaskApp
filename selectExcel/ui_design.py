@@ -79,10 +79,15 @@ class ExcelMapperUI(QWidget):
         self.btn_combine = QPushButton('💎 3. OK COMBINE (GỘP TẤT CẢ)')
         self.btn_combine.setStyleSheet("background-color: #8e44ad; color: white; font-weight: bold;")
         self.btn_combine.setFixedHeight(40)
+        
+        self.btn_grouping = QPushButton('💎 4. ĐÁNH GIÁ TRÙNG LẶP (PREVIEW)')
+        self.btn_grouping.setStyleSheet("background-color: #8e44ad; color: white; font-weight: bold;")
+        self.btn_grouping.setFixedHeight(40)
 
         right_col.addWidget(self.list_pending)
         right_col.addWidget(self.btn_transfer)
         right_col.addWidget(self.btn_combine)
+        right_col.addWidget(self.btn_grouping)
 
         bottom_area.addLayout(left_col, 7) # Chiếm 7 phần
         bottom_area.addLayout(right_col, 3) # Chiếm 3 phần
