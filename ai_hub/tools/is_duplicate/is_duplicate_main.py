@@ -214,7 +214,7 @@ class ExcelProcessor(ExcelMapperUI):
             try:
                 # 2. Gọi logic xử lý từ AIgemini.py
                 # Anh lưu ý: col_name và col_spec phải khớp hoàn toàn với Barem của anh
-                processed_df = MaterialProcessor.mark_duplicates(
+                processed_df = MaterialProcessor.mark_duplicates_with_ai(
                     self.current_preview_df, 
                     col_name='Tên vật tư', 
                     col_spec='Thông số kỹ thuật' 

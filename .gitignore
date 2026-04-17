@@ -17,3 +17,11 @@ vattu_index
 *.tmp
 getnewtaskinweek/*.json
 *.xlsx
+node_modules
+
+*.xlsx
+*.docx
+*.rar
+KetQua_*.docx
+*.json
+!app_config.json

@@ -1,22 +1,15 @@
 import os
 import json  # <-- THÊM DÒNG NÀY VÀO ĐÂY
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from pathlib import Path
 from dotenv import load_dotenv
-
+from pathlib import Path
 class MaterialProcessor:
     @staticmethod
     def _load_api_key():
-        """Hàm nội bộ để nạp API Key từ thư mục gốc TaskApp"""
-        try:
-            # Nhảy ngược 4 cấp: is_duplicate -> tools -> ai_hub -> TaskApp
-            root_path = Path(__file__).resolve().parents[3]
-            env_path = root_path / '.env'
-            load_dotenv(dotenv_path=env_path)
-            return os.getenv("API-KEY-GOOGLE")
-        except:
-            return None
+        """Hard code API Key trực tiếp"""
+        return "AIzaSyBkaYzBTjwVKd3rl4p3VM7ZhAiGVsP7SrQ" # Dán cái Key của bạn vào giữa dấu ngoặc kép này
 
     @staticmethod
     def mark_duplicates(df, col_name='Tên vật tư', col_spec='Thông số kỹ thuật'):
@@ -42,50 +35,85 @@ class MaterialProcessor:
         return working_df
 
     @staticmethod
-    def mark_duplicates_with_ai(df, col_name='Tên vật tư', col_spec='Thông số kỹ thuật'):
-        # 1. Chạy thuật toán Pandas trước để có Group_ID cơ bản
-        working_df = MaterialProcessor.mark_duplicates(df, col_name, col_spec)
-        
-        # 2. Lấy API Key và cấu hình
-        api_key = MaterialProcessor._load_api_key()
-        if not api_key: return working_df
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    
+    
+    
 
-        # 3. Chuẩn bị dữ liệu cho AI (Gửi danh sách để AI tìm các cặp tương đương)
-        # Chỉ gửi các dòng chưa bị Code thường bắt được hoặc toàn bộ để AI rà soát lại
+    def mark_duplicates_with_ai(df, col_name='Tên vật tư', col_spec='Thông số kỹ thuật'):
+        print("\n" + "="*50)
+        print("🚀 [NEW SDK] KHỞI CHẠY KIỂM TRA TRÙNG LẶP AI")
+        print("="*50)
+
+        # 1. Chạy Pandas & Reset Index
+        working_df = MaterialProcessor.mark_duplicates(df, col_name, col_spec)
+        working_df = working_df.reset_index(drop=True)
+        print(f"✅ Bước 1: Đã chạy Pandas. Tổng số dòng: {len(working_df)}")
+
+        # 2. Lấy API Key
+        api_key = MaterialProcessor._load_api_key()
+        if not api_key:
+            print("❌ LỖI: Không tìm thấy API Key.")
+            return working_df
+
+        # 3. Khởi tạo Client theo chuẩn thư viện 'google-genai' mới
+        try:
+            client = genai.Client(api_key=api_key)
+            print("✅ Bước 2: Đã khởi tạo Google GenAI Client.")
+        except Exception as e:
+            print(f"❌ LỖI khởi tạo Client: {e}")
+            return working_df
+
+        # 4. Chuẩn bị dữ liệu cho AI
         data_list = working_df[[col_name, col_spec]].head(50).to_dict(orient='records')
         
         prompt = f"""
-        Bạn là chuyên gia thẩm định vật tư cơ khí điện tại nhà máy.
-        Nhiệm vụ: Tìm các dòng vật tư tương đương nhau trong danh sách dưới đây.
-        
-        Danh sách: {data_list}
-        
-        YÊU CẦU QUAN TRỌNG:
-        - Trả về kết quả duy nhất dưới dạng JSON list của các list chỉ số dòng (index) trùng nhau.
-        - Ví dụ: [[0, 2, 5], [1, 4]] nghĩa là dòng 0, 2, 5 là một loại; dòng 1, 4 là một loại.
-        - Chỉ trả về mã JSON, không giải thích gì thêm.
+        Bạn là chuyên gia thẩm định vật tư cơ khí tại nhà máy.
+        Tìm các dòng vật tư tương đương (cùng loại nhưng viết khác nhau).
+        Dữ liệu: {data_list}
+        Trả về JSON list các nhóm index trùng. Ví dụ: [[0, 2], [5, 10]]
+        Chỉ trả về JSON, không giải thích.
         """
 
+        # 5. Gọi AI xử lý
         try:
-            response = model.generate_content(prompt)
-            # Làm sạch chuỗi JSON từ AI (loại bỏ ```json ... ``` nếu có)
-            clean_json = response.text.replace('```json', '').replace('```', '').strip()
-            duplicate_groups = json.loads(clean_json)
+            print(f"📡 Đang gửi dữ liệu sang Gemini 3 Flash...")
+            
+            response = client.models.generate_content(
+                # Thử lần lượt các tên này nếu vẫn bị 404:
+                # 1. 'gemini-3-flash' 
+                # 2. 'models/gemini-3-flash'
+                model='gemini-3-flash', 
+                contents=prompt,
+                config={
+                    'response_mime_type': 'application/json',
+                }
+            )
+            
+            res_text = response.text.strip()
+            print(f"📩 AI phản hồi: {res_text}")
+            
+            duplicate_groups = json.loads(res_text)
 
-            # 4. Cập nhật Group_ID mới từ AI vào DataFrame
-            # Bắt đầu Group_ID của AI sau Group_ID lớn nhất của Pandas để không bị trùng
+            if not duplicate_groups:
+                print("ℹ️ AI không tìm thấy thêm nhóm trùng.")
+                return working_df
+
+            # 6. Cập nhật kết quả vào DataFrame
             current_max_id = working_df['Group_ID'].max() if pd.notna(working_df['Group_ID'].max()) else 0
             
             for group in duplicate_groups:
+                if len(group) < 2: continue
                 current_max_id += 1
                 for idx in group:
                     if idx < len(working_df):
                         working_df.at[idx, 'Group_ID'] = current_max_id
                         working_df.at[idx, 'Is_Duplicate'] = True
+            
+            print(f"🎯 Đã cập nhật xong {len(duplicate_groups)} nhóm từ AI.")
 
         except Exception as e:
-            print(f"Lỗi xử lý logic AI: {e}")
+            print(f"⚠️ Lỗi thực thi AI: {e}")
 
+        print("="*50 + "\n")
         return working_df
