@@ -80,11 +80,18 @@ class TaskManager(QWidget):
         self.btn_weekly.setFixedSize(100, 28)
         self.btn_weekly.setStyleSheet("background: #005A9E; color: white; font-weight: bold; border-radius: 5px;")
         
+        # THÊM NÚT CÔNG CỤ AI VÀO ĐÂY
+        self.btn_ai = QPushButton("🤖 AI")
+        self.btn_ai.clicked.connect(self.show_ai_features)
+        self.btn_ai.setFixedSize(100, 28)
+        self.btn_ai.setStyleSheet("background: #FF6600; color: white; font-weight: bold; border-radius: 5px;")
+        
         top_row.addWidget(self.status_msg)
         top_row.addStretch()
         top_row.addWidget(self.btn_dash)
         top_row.addWidget(self.btn_report)
         top_row.addWidget(self.btn_weekly)
+        top_row.addWidget(self.btn_ai)
         layout.addLayout(top_row)
 
         # --- HÀNG 2: TÌM KIẾM ---
@@ -1114,3 +1121,15 @@ class TaskManager(QWidget):
             error_details = traceback.format_exc()
             print(f"Lỗi xuất báo cáo: {error_details}")
             # QMessageBox.critical(self, "Lỗi", f"Không thể xuất báo cáo: {str(e)}")
+    def show_ai_features(self):
+        if hasattr(self, 'ai_window') and self.ai_window.isVisible():
+            self.ai_window.activateWindow()
+            return
+            
+        try:
+            # Gọi thẳng từ Package ai_hub
+            from ai_hub import AIWindow 
+            self.ai_window = AIWindow()
+            self.ai_window.show()
+        except Exception as e:
+            self.status_msg.setText(f"❌ Lỗi: {str(e)}")
